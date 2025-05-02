@@ -23,15 +23,26 @@ class Task:
 # ----- Funktioner -----
 def calculate_schedule(tasks):
     G = nx.DiGraph()
+    task_names = {t.name for t in tasks}
     for task in tasks:
         G.add_node(task.name, task=task)
         for dep in task.dependencies:
+            if dep not in task_names:
+                st.error(f"Beroendet '{dep}' finns inte som uppgift.")
+                return []
             G.add_edge(dep, task.name)
 
-    sorted_tasks = list(nx.topological_sort(G))
+    try:
+        sorted_tasks = list(nx.topological_sort(G))
+    except nx.NetworkXUnfeasible:
+        st.error("Det finns en cirkulär beroendeloop i uppgifterna!")
+        return []
 
     for name in sorted_tasks:
-        task = next(t for t in tasks if t.name == name)
+        task = next((t for t in tasks if t.name == name), None)
+        if not task:
+            st.error(f"Uppgift '{name}' saknas i listan.")
+            return []
         if not task.dependencies:
             task.early_start = 0
         else:
@@ -117,7 +128,8 @@ if submitted and name:
 if st.session_state.tasks:
     st.subheader("Planerade uppgifter")
     tasks = calculate_schedule(st.session_state.tasks)
-    render_gantt(tasks)
-    export_data(tasks)
+    if tasks:
+        render_gantt(tasks)
+        export_data(tasks)
 else:
     st.info("Lägg till uppgifter för att generera ett schema.")
